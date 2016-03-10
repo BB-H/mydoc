@@ -1,0 +1,70 @@
+Solr使用笔记：
+bin/solr start -p 8984        指定端口启动
+bin/solr stop -all        关闭服务
+
+bin/solr create -c abc
+        abc是core或collection的名字，取决于solr是单机版还是cloud版本；刷新http://localhost:8983/solr ，可以看到core selector中多了一个abc
+        abc目录的位置创建在solr.solr.home（默认是solr的server/solr目录）目录下
+		
+数据库配置：
+1. 在/server/solr/<abc>/conf/solrconfig.xml添加：
+	<lib dir="${solr.install.dir:../../../..}/dist/" regex="solr-dataimporthandler-.*\.jar" />
+	<lib dir="${solr.install.dir:../../../..}/dist/" regex="solr-dataimporthandler-extras-.*\.jar" />
+	<lib dir="${solr.install.dir:../../../..}/dist/" regex="mysql-connector-java-5.1.5.jar" /> //需要先找到这个JAR并放到dist中
+   还要添加：
+   <requestHandler name="/dataimport" class="org.apache.solr.handler.dataimport.DataImportHandler">
+    <lst name="defaults">
+      <str name="config">./data-config.xml</str>
+    </lst>
+  </requestHandler>
+  
+2.新建一个data-config.xml
+	<?xml version="1.0" encoding="UTF-8" ?>
+	<dataConfig>
+		<!-- 这里有两个数据源-->
+		<dataSource type="JdbcDataSource" name="amazon" driver="com.mysql.jdbc.Driver" url="jdbc:mysql://localhost/amazon_cn" user="root" password="XXXXX"/>
+		<dataSource type="JdbcDataSource" name="jd" driver="com.mysql.jdbc.Driver" url="jdbc:mysql://localhost/worth_mai" user="root" password="XXXXX"/>
+		<document name="commodities">
+			两个entity使用不同的数据源
+			<entity name="jdItem" dataSource="jd" transformer="TemplateTransformer" query="select id as dbid,jd_id,name,item_price from JD_Item">
+				<field column="dbid" name="dbId" />
+				<field column="id" template="jd-${jdItem.dbid}"/>
+				<field column="item_price" name="price" />
+				<field column="jd_id" name="itemId" />
+				<field column="name" name="name" />
+			</entity>
+			<entity name="amazonItem" dataSource="amazon" transformer="TemplateTransformer" query="select id as dbid,amazon_id,name,price from amazon_item">
+				<field column="dbid" name="dbId" />
+				<field column="id" template="amazon-${amazonItem.dbid}"/>
+				<field column="amazon_id" name="itemId" />
+				<field column="name" name="name" />
+				<field column="price" name="price" />
+			</entity>
+		</document>
+	</dataConfig>
+3.添加managed-schema中添加field：
+	<field name="dbId" type="strings" indexed="true" stored="true"/>
+	<field name="name" type="strings" indexed="true" stored="true"/>
+	<field name="price" type="strings" indexed="true" stored="true"/>
+	<field name="itemId" type="strings" indexed="true" stored="true"/>
+
+中文分词：
+	下载mmseg4j-core-1.10.0.jar和mmseg4j-solr-2.3.0.jar, 复制到solr class path中，比如<solr>/server/solr-webapp/webapp/WEB-INF/lib
+	配置分词，修改managed-schema配置，增加如下：
+	<fieldtype name="textComplex" class="solr.TextField" positionIncrementGap="100">  
+	   <analyzer>  
+		   <tokenizer class="com.chenlb.mmseg4j.solr.MMSegTokenizerFactory" mode="complex" />  
+	   </analyzer>  
+	</fieldtype>  
+	<fieldtype name="textMaxWord" class="solr.TextField" positionIncrementGap="100">  
+		<analyzer>  
+			<tokenizer class="com.chenlb.mmseg4j.solr.MMSegTokenizerFactory" mode="max-word" />  
+		</analyzer>  
+	</fieldtype>  
+	<fieldtype name="textSimple" class="solr.TextField" positionIncrementGap="100">  
+		<analyzer>  
+			<tokenizer class="com.chenlb.mmseg4j.solr.MMSegTokenizerFactory" mode="simple" />  
+		</analyzer>  
+	</fieldtype>
+	修改managed-schema中自定义的field， type属性改为type="textComplex"，如下：
+	<field name="name" type="textComplex" indexed="true" stored="true"/>
