@@ -1,0 +1,7 @@
+1. Apply Docker
+2. Spider refine for resuming crawling after restart
+3. DB optimization: indexing
+4. Solr: delta data import (time bases)
+5. Wechat web server development
+6. solr : http access control. Only local access
+7. Solr: optimize/limit query results.
