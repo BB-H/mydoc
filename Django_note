@@ -1,0 +1,5 @@
+新建project: django-admin startproject mysite
+
+启动dev server: python manage.py runserver
+在指定端口启动dev server: python manage.py runserver 8080
+在指定端口启动dev server并允许远程访问: python manage.py runserver 0.0.0.0.:8080
